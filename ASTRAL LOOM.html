@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>星轨织梦 | ASTRAL LOOM — Master Edition</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Noto+Serif+SC:wght@300;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-void: #05070c;
+      --gold-brass: #d8b47c;
+      --gold-bright: #f6e2be;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      background-color: var(--bg-void);
+      color: #f2ece1;
+      font-family: 'Noto Serif SC', 'Cormorant Garamond', serif;
+    }
+
+    .font-cinzel { font-family: 'Cinzel', serif; }
+    .font-serif-cn { font-family: 'Noto Serif SC', serif; }
+
+    /* 全屏星象仪流体画布 */
+    #astrolabe-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100dvh;
+      display: block;
+      z-index: 1;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    #astrolabe-canvas:active { cursor: grabbing; }
+
+    /* 无框浮动艺术排版 HUD */
+    .hud-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: clamp(16px, 3.2vw, 30px);
+      transition: opacity 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .pointer-auto { pointer-events: auto; }
+
+    .hairline-gold {
+      height: 1px;
+      background: linear-gradient(90deg, rgba(216,180,124,0.7), rgba(216,180,124,0.03));
+    }
+
+    .hairline-gold-center {
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(216,180,124,0.65), transparent);
+    }
+
+    /* 悬浮微控件按钮 */
+    .glyph-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid rgba(216, 180, 124, 0.3);
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08), rgba(5,7,12,0.5));
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #d8b47c;
+      transition: all 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .glyph-btn:hover {
+      border-color: rgba(246, 226, 190, 0.85);
+      box-shadow: 0 0 20px rgba(216, 180, 124, 0.38);
+      transform: translateY(-1px) scale(1.05);
+      color: #fff;
+    }
+
+    .glyph-btn:active { transform: scale(0.94); }
+
+    /* 无遮罩无缝标题浮层：直接悬浮于运转的星象仪上下方 */
+    #seamless-title-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7.5vh 20px 8vh;
+      transition: opacity 0.95s cubic-bezier(0.22, 1, 0.36, 1), transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    #seamless-title-layer.awakened {
+      opacity: 0;
+      transform: scale(1.06);
+      visibility: hidden;
+    }
+
+    @keyframes floatBreath {
+      0%, 100% { opacity: 0.55; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(-3px); }
+    }
+
+    .awaken-whisper {
+      animation: floatBreath 3s infinite ease-in-out;
+    }
+
+    /* 诗意浮动横幅 */
+    @keyframes poeticFade {
+      0% { opacity: 0; transform: translateY(10px) scale(0.96); letter-spacing: 0.36em; }
+      22% { opacity: 1; transform: translateY(0) scale(1); letter-spacing: 0.22em; }
+      78% { opacity: 1; transform: translateY(-3px) scale(1); letter-spacing: 0.22em; }
+      100% { opacity: 0; transform: translateY(-12px) scale(0.98); letter-spacing: 0.28em; }
+    }
+
+    .poetic-toast {
+      animation: poeticFade 1.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    /* 诗意星图明信片通关浮层（透明底部让本局编织的星轨织锦完整透出） */
+    #tapestry-postcard {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6.5vh 24px 7vh;
+      background: radial-gradient(circle at 50% 50%, rgba(5, 7, 12, 0.12) 0%, rgba(5, 7, 12, 0.78) 82%);
+      transition: opacity 0.9s ease, visibility 0.9s;
+    }
+
+    #tapestry-postcard.active {
+      opacity: 1;
+      visibility: visible;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 全屏交互星象仪画布 -->
+  <canvas id="astrolabe-canvas"></canvas>
+
+  <!-- 1. 无缝入场标题层（无黑屏遮罩，直接点击中央星仪核心唤醒） -->
+  <div id="seamless-title-layer">
+    <div class="text-center">
+      <p class="font-cinzel text-[10px] sm:text-xs tracking-[0.45em] text-[#d8b47c]/85 uppercase">
+        ASTRAL LOOM · MASTER EDITION
+      </p>
+      <h1 class="font-serif-cn text-3xl sm:text-5xl font-light tracking-[0.32em] text-[#f7f2ea] mt-2 drop-shadow-[0_0_24px_rgba(216,180,124,0.35)]">
+        星轨织梦
+      </h1>
+      <div class="hairline-gold-center w-44 mx-auto mt-3"></div>
+    </div>
+
+    <!-- 中央留给转动的黄铜星象仪本身，玩家可直接点击星盘核心唤醒 -->
+    <div class="flex flex-col items-center text-center pointer-auto">
+      <button id="btn-awaken-core" class="awaken-whisper px-7 py-2.5 rounded-full border border-[#d8b47c]/45 bg-[#080b12]/50 backdrop-blur-md hover:border-[#f6e2be] hover:bg-[#d8b47c]/15 transition-all duration-500">
+        <span class="font-serif-cn text-xs sm:text-sm tracking-[0.32em] text-[#f6e2be]">
+          轻触星仪核心以唤醒
+        </span>
+      </button>
+      <span class="font-cinzel text-[9px] tracking-[0.35em] text-slate-400/70 uppercase mt-2.5">
+        TOUCH THE CELESTIAL CORE
+      </span>
+    </div>
+  </div>
+
+  <!-- 2. 游戏中无框浮动艺术 HUD -->
+  <div class="hud-layer" id="game-hud" style="opacity: 0;">
+    <!-- 顶部诗篇与微图标 -->
+    <div class="flex items-start justify-between w-full max-w-5xl mx-auto">
+      <div class="flex flex-col max-w-[68%]">
+        <div class="flex items-center gap-2.5">
+          <span id="act-roman" class="font-cinzel text-[11px] tracking-[0.35em] text-[#d8b47c] uppercase">ACT I</span>
+          <span class="w-1 h-1 rounded-full bg-[#d8b47c]/60"></span>
+          <span id="act-constellation-en" class="font-cinzel text-[10px] tracking-[0.25em] text-slate-400 uppercase">LYRA · THE HARP</span>
+        </div>
+        <h2 id="act-title" class="font-serif-cn text-xl sm:text-2xl font-medium tracking-[0.18em] text-[#f6f0e6] mt-1">
+          第一幕 · 天琴初鸣
+        </h2>
+        <div class="hairline-gold w-36 sm:w-48 my-2"></div>
+        <p id="act-poem" class="text-xs sm:text-[13px] text-slate-300/85 italic tracking-wider leading-relaxed">
+          “拨动同心黄铜星轨，让散落的星芒重新连成天琴的七弦。”
+        </p>
+      </div>
+
+      <!-- 右上角极简悬浮按钮 -->
+      <div class="flex items-center gap-2.5 pointer-auto">
+        <button id="btn-hint" class="glyph-btn" title="星灵指引">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z"/>
+          </svg>
+        </button>
+        <button id="btn-reshuffle" class="glyph-btn" title="星盘重塑">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21h5v-5"/>
+          </svg>
+        </button>
+        <button id="btn-audio" class="glyph-btn" title="宇宙声景开关">
+          <svg id="icon-audio-on" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+          </svg>
+          <svg id="icon-audio-off" class="w-4 h-4 hidden opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 中央诗意反馈提示 -->
+    <div id="toast-anchor" class="flex flex-col items-center justify-center my-auto"></div>
+
+    <!-- 底部星座主星点亮进度与星辉共鸣 -->
+    <div class="flex flex-col items-center w-full max-w-2xl mx-auto gap-2.5">
+      <!-- 星座主星与星芒收集无框徽记 -->
+      <div id="objectives-bar" class="flex flex-wrap items-center justify-center gap-5 sm:gap-8 px-4 py-1"></div>
+
+      <div class="hairline-gold-center w-64 sm:w-80"></div>
+
+      <div class="flex items-center justify-between w-full max-w-md text-[11px] tracking-[0.2em] text-slate-400/90 px-2">
+        <span id="constellation-progress-text">星座苏醒度 · 0%</span>
+        <span class="font-cinzel text-[#d8b47c]">
+          RESONANCE <strong id="score-val" class="text-sm text-[#f6e2be] font-normal ml-1">0</strong>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. 通关诗意星图明信片（保留本局编织的所有星弦织锦） -->
+  <div id="tapestry-postcard">
+    <div class="text-center">
+      <p id="postcard-sub" class="font-cinzel text-[11px] tracking-[0.42em] text-[#d8b47c] uppercase">
+        CONSTELLATION AWAKENED
+      </p>
+      <h2 id="postcard-title" class="font-serif-cn text-2xl sm:text-4xl font-light tracking-[0.24em] text-[#f7f2ea] mt-1.5">
+        天琴座 · 星轨织锦已成
+      </h2>
+      <div class="hairline-gold-center w-48 mx-auto my-3"></div>
+      <p id="postcard-verse" class="text-xs sm:text-sm text-slate-300/90 italic tracking-widest max-w-md mx-auto">
+        “指尖拨动过的每一道弧光，都在深空中凝结为永恒的琴弦。”
+      </p>
+    </div>
+
+    <!-- 中央留白：让星盘上叠加保留的“本局所有星弦轨迹织锦”与苏醒星座完整展示 -->
+    <div class="my-auto pointer-events-none"></div>
+
+    <div class="flex flex-col items-center gap-4">
+      <div class="flex items-center gap-8 text-center">
+        <div>
+          <div class="font-cinzel text-[10px] tracking-[0.25em] text-slate-400">THREADS WOVEN</div>
+          <div id="postcard-threads" class="font-cinzel text-xl text-[#f6e2be] mt-0.5">0</div>
+        </div>
+        <div class="w-px h-7 bg-[#d8b47c]/25"></div>
+        <div>
+          <div class="font-cinzel text-[10px] tracking-[0.25em] text-slate-400">RESONANCE</div>
+          <div id="postcard-score" class="font-cinzel text-xl text-[#9ed8c4] mt-0.5">0</div>
+        </div>
+      </div>
+
+      <button id="btn-next-act" class="px-9 py-3 rounded-full border border-[#d8b47c]/75 bg-[#0c101a]/75 backdrop-blur-md hover:bg-[#d8b47c]/25 text-[#f7f2ea] font-serif-cn text-sm tracking-[0.28em] transition-all duration-300 shadow-[0_0_25px_rgba(216,180,124,0.28)]">
+        踏入下一星域
+      </button>
+    </div>
+  </div>
+
+<script>
+/**
+ * ============================================================================
+ * 1. 程序化宇宙声景与精密黄铜棘轮音效引擎 (Web Audio API)
+ * ============================================================================
+ */
+class AstralAudioEngine {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+    // 利底亚宇宙音阶 (C Lydian)
+    this.lydianScale = [261.63, 293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 739.99, 783.99, 880.00];
+  }
+
+  init() {
+    if (!this.ctx) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioCtx();
+    }
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+  }
+
+  toggleMute() {
+    this.muted = !this.muted;
+    return this.muted;
+  }
+
+  // 精密黄铜棘轮“咔哒”声（带微小金属泛音）
+  playBrassRatchet(ringIndex = 0, isSnap = false) {
+    if (this.muted) return;
+    this.init();
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const overtone = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+
+    const baseFreq = (isSnap ? 820 : 640) + ringIndex * 95;
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.42, now + 0.038);
+
+    overtone.type = 'sine';
+    overtone.frequency.setValueAtTime(baseFreq * 2.4, now);
+    overtone.frequency.exponentialRampToValueAtTime(baseFreq * 1.1, now + 0.025);
+
+    gain.gain.setValueAtTime(isSnap ? 0.08 : 0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.0006, now + 0.042);
+
+    osc.connect(gain);
+    overtone.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start(now);
+    overtone.start(now);
+    osc.stop(now + 0.045);
+    overtone.stop(now + 0.045);
+  }
+
+  // 星弦跃迁音效
+  playLinkSwap() {
+    if (this.muted) return;
+    this.init();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(392.00, now);
+    osc.frequency.exponentialRampToValueAtTime(587.33, now + 0.14);
+
+    gain.gain.setValueAtTime(0.07, now);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.15);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.16);
+  }
+
+  playRebound() {
+    if (this.muted) return;
+    this.init();
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(230, now);
+    osc.frequency.exponentialRampToValueAtTime(155, now + 0.18);
+
+    gain.gain.setValueAtTime(0.065, now);
+    gain.gain.exponentialRampToValueAtTime(0.0008, now + 0.19);
+
+    osc.connect(gain);
+    gain.connect(this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.2);
+  }
+
+  // 消除共鸣：竖琴泛音琶音 + 高光时刻深沉宇宙共鸣低音
+  playConstellationHarmonic(combo = 1, isGrand = false) {
+    if (this.muted) return;
+    this.init();
+    const now = this.ctx.currentTime;
+    const startIdx = Math.min((combo - 1) * 2, this.lydianScale.length - 5);
+    const notes = [
+      this.lydianScale[startIdx],
+      this.lydianScale[startIdx + 2],
+      this.lydianScale[startIdx + 4]
+    ];
+    if (isGrand) notes.push(this.lydianScale[startIdx + 6]);
+
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.042;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(freq, t);
+
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.11, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0005, t + 1.05);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(t);
+      osc.stop(t + 1.08);
+    });
+
+    // 高光时刻加入温暖深邃的宇宙低音共鸣
+    if (isGrand) {
+      const bass = this.ctx.createOscillator();
+      const bGain = this.ctx.createGain();
+      bass.type = 'sine';
+      bass.frequency.setValueAtTime(130.81, now); // C3
+      bass.frequency.exponentialRampToValueAtTime(65.41, now + 0.85); // C2
+      bGain.gain.setValueAtTime(0.14, now);
+      bGain.gain.exponentialRampToValueAtTime(0.0008, now + 0.9);
+      bass.connect(bGain);
+      bGain.connect(this.ctx.destination);
+      bass.start(now);
+      bass.stop(now + 0.92);
+    }
+  }
+}
+
+const audio = new AstralAudioEngine();
+
+/**
+ * ============================================================================
+ * 2. 星辰物种与四大叙事星座图腾定义
+ * ============================================================================
+ */
+const STAR_SPECIES = [
+  { id: 0, name: '翠微星', core: '#e8fff6', mid: '#6fd4b2', deep: '#1f6350', glow: 'rgba(111, 212, 178, 0.75)', sides: 4 },
+  { id: 1, name: '琥珀星', core: '#fff5e0', mid: '#ebb365', deep: '#784814', glow: 'rgba(235, 179, 101, 0.75)', sides: 6 },
+  { id: 2, name: '绯霞星', core: '#ffe8ee', mid: '#e8829a', deep: '#732438', glow: 'rgba(232, 130, 154, 0.75)', sides: 5 },
+  { id: 3, name: '沧溟星', core: '#e6f4ff', mid: '#6ca8e6', deep: '#1e4675', glow: 'rgba(108, 168, 230, 0.75)', sides: 3 },
+  { id: 4, name: '紫垣星', core: '#f3ebff', mid: '#ad8ce6', deep: '#452b75', glow: 'rgba(173, 140, 230, 0.75)', sides: 8 }
+];
+
+// 四幕叙事章节：每幕拥有背景深处浮现的专属星座图腾线稿（归一化极坐标）
+const ACTS = [
+  {
+    roman: 'ACT I',
+    en: 'LYRA · THE CELESTIAL HARP',
+    title: '第一幕 · 天琴初鸣',
+    constellationName: '天琴座',
+    poem: '“拨动同心黄铜星轨，让散落的星芒重新连成天琴的七弦。”',
+    closingVerse: '“指尖拨动过的每一道弧光，都在深空中凝结为永恒的琴弦。”',
+    // 背景星云情绪色相：深海幽蓝 -> 暮光金
+    nebulaStart: [12, 22, 42],
+    nebulaEnd: [42, 34, 24],
+    moves: 22,
+    eclipseCount: 0,
+    targets: [
+      { type: 0, count: 12 },
+      { type: 1, count: 12 }
+    ],
+    // 天琴座主星点与连线（归一化坐标 -1 ~ 1）
+    constellation: {
+      stars: [
+        { x: -0.35, y: -0.45, name: '织女一' },
+        { x: -0.12, y: -0.22 },
+        { x: 0.14, y: -0.28 },
+        { x: 0.32, y: 0.18 },
+        { x: 0.06, y: 0.44 },
+        { x: -0.24, y: 0.25 }
+      ],
+      edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 1]]
+    }
+  },
+  {
+    roman: 'ACT II',
+    en: 'ORION · NIGHT WATCHER',
+    title: '第二幕 · 猎户巡夜',
+    constellationName: '猎户座',
+    poem: '“日蚀暗影封存了古老星位，唯有邻近的星弦共鸣能将其净化。”',
+    closingVerse: '“参宿三连星再次闪耀，暗夜中的巡礼者已寻回方向。”',
+    nebulaStart: [22, 14, 44],
+    nebulaEnd: [52, 24, 46],
+    moves: 24,
+    eclipseCount: 4,
+    targets: [
+      { type: 2, count: 14 },
+      { type: 3, count: 14 }
+    ],
+    constellation: {
+      stars: [
+        { x: -0.34, y: -0.46 }, // 参宿四
+        { x: 0.30, y: -0.42 },  // 参宿五
+        { x: -0.14, y: 0.02 },  // 腰带一
+        { x: 0.00, y: -0.02 },  // 腰带二
+        { x: 0.14, y: -0.06 },  // 腰带三
+        { x: -0.28, y: 0.46 },  // 参宿六
+        { x: 0.34, y: 0.42 }    // 参宿七
+      ],
+      edges: [[0, 2], [1, 4], [2, 3], [3, 4], [2, 5], [4, 6], [5, 6], [0, 1]]
+    }
+  },
+  {
+    roman: 'ACT III',
+    en: 'CYGNUS · NORTHERN CROSS',
+    title: '第三幕 · 银河渡鸦',
+    constellationName: '天鹅座',
+    poem: '“弧线与星轴交汇之处，超新星将在寂静的微顿中绽放。”',
+    closingVerse: '“北十字星翼掠过银汉，所有被封印的星辉尽数苏醒。”',
+    nebulaStart: [10, 30, 36],
+    nebulaEnd: [24, 52, 48],
+    moves: 25,
+    eclipseCount: 6,
+    targets: [
+      { type: 1, count: 14 },
+      { type: 4, count: 14 },
+      { type: 0, count: 12 }
+    ],
+    constellation: {
+      stars: [
+        { x: 0.00, y: -0.52 },
+        { x: 0.00, y: -0.08 },
+        { x: 0.00, y: 0.48 },
+        { x: -0.46, y: -0.12 },
+        { x: 0.46, y: -0.12 }
+      ],
+      edges: [[0, 1], [1, 2], [3, 1], [1, 4]]
+    }
+  },
+  {
+    roman: 'ACT IV',
+    en: 'CORONA BOREALIS · CROWN',
+    title: '第四幕 · 织梦冠冕',
+    constellationName: '北冕座',
+    poem: '“万千星轨皆归于心，你即是编织宇宙韵律的织梦者。”',
+    closingVerse: '“七颗明珠连成永恒冠冕，星象仪为你奏响无尽序曲。”',
+    nebulaStart: [26, 18, 16],
+    nebulaEnd: [58, 42, 24],
+    moves: 26,
+    eclipseCount: 8,
+    targets: [
+      { type: 2, count: 15 },
+      { type: 4, count: 15 },
+      { type: 3, count: 15 }
+    ],
+    constellation: {
+      stars: [
+        { x: -0.46, y: -0.16 },
+        { x: -0.36, y: 0.18 },
+        { x: -0.16, y: 0.36 },
+        { x: 0.06, y: 0.38 },
+        { x: 0.28, y: 0.24 },
+        { x: 0.42, y: -0.04 },
+        { x: 0.44, y: -0.32 }
+      ],
+      edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6]]
+    }
+  }
+];
+
+/**
+ * ============================================================================
+ * 3. 星轨织梦大师版引擎（弹簧物理、微顿帧、镜头呼吸、星弦织锦保存）
+ * ============================================================================
+ */
+class AstralLoomMasterGame {
+  constructor() {
+    this.canvas = document.getElementById('astrolabe-canvas');
+    this.ctx = this.canvas.getContext('2d');
+
+    this.NUM_RINGS = 4;
+    this.NUM_SECTORS = 8;
+    this.SECTOR_ANGLE = (Math.PI * 2) / this.NUM_SECTORS;
+
+    this.grid = Array.from({ length: this.NUM_RINGS }, () => Array(this.NUM_SECTORS).fill(null));
+    this.uidSeq = 1;
+
+    // 轨道旋转视觉偏移与弹簧角速度（实现松手棘轮过冲回弹手感）
+    this.ringVisualOffset = [0, 0, 0, 0];
+    this.ringAngularVel = [0, 0, 0, 0];
+    this.ambientAngle = 0;
+
+    // 镜头呼吸缩放与无缝入场推镜参数
+    this.cameraScale = 0.84;      // 标题界面略微远景俯瞰
+    this.targetCameraScale = 0.84;
+    this.cameraPulseVel = 0;
+    this.hitStopTimer = 0;        // 微顿帧剩余毫秒数
+
+    // 叙事与关卡状态
+    this.isAwakened = false;
+    this.isPostcardView = false;
+    this.actIndex = 0;
+    this.movesLeft = 22;
+    this.maxMoves = 22;
+    this.score = 0;
+    this.targets = [];
+    this.combo = 0;
+    this.isBusy = false;
+
+    // 交互状态
+    this.interactionMode = null;
+    this.activeRing = -1;
+    this.dragStartAngle = 0;
+    this.lastTickStep = 0;
+    this.selectedNode = null;
+    this.hintNodes = [];
+
+    // 视觉特效与本局“星轨织锦”永久记录
+    this.activeThreads = [];      // 正在闪烁的消除星弦
+    this.wovenTapestry = [];      // 本局累计编织的所有星弦轨迹（归一化坐标，用于生成通关明信片！）
+    this.particles = [];
+    this.ripples = [];
+    this.auroraPulse = 0;
+
+    this.bgStars = Array.from({ length: 95 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      size: 0.5 + Math.random() * 1.6,
+      alpha: 0.15 + Math.random() * 0.65,
+      phase: Math.random() * Math.PI * 2
+    }));
+
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    this.bindInputEvents();
+    this.loadAct(0, true);
+    this.startRenderLoop();
+  }
+
+  resize() {
+    // 移动设备高 DPR 画布会显著放大像素填充量；限制到 2，保持清晰并减轻卡顿。
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    this.width = window.innerWidth;
+    this.height = window.innerHeight;
+    this.canvas.width = this.width * dpr;
+    this.canvas.height = this.height * dpr;
+    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    this.cx = this.width / 2;
+    this.cy = this.height / 2;
+    const minDim = Math.min(this.width, this.height * 0.84);
+    this.outerDialRadius = minDim * 0.455;
+    this.ringRadii = [
+      this.outerDialRadius * 0.27,
+      this.outerDialRadius * 0.47,
+      this.outerDialRadius * 0.67,
+      this.outerDialRadius * 0.87
+    ];
+    this.nodeRadius = Math.max(14, Math.min(23, this.outerDialRadius * 0.088));
+  }
+
+  // 无缝入场唤醒仪式：镜头平滑推进，星辰逐颗点亮苏醒
+  awakenAstrolabe() {
+    if (this.isAwakened) return;
+    this.isAwakened = true;
+    audio.init();
+    audio.playConstellationHarmonic(3, true);
+
+    document.getElementById('seamless-title-layer').classList.add('awakened');
+    document.getElementById('game-hud').style.opacity = '1';
+
+    // 镜头平滑推入交互距离
+    this.targetCameraScale = 1.0;
+
+    // 星辰从内圈到外圈依次点亮波纹
+    for (let r = 0; r < this.NUM_RINGS; r++) {
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        const node = this.grid[r][s];
+        if (!node) continue;
+        node.scale = 0.25;
+        node.alpha = 0;
+        node.awakenDelay = r * 7 + s * 1.5;
+      }
+    }
+
+    setTimeout(() => {
+      const cfg = ACTS[this.actIndex];
+      this.showPoeticToast(cfg.title, cfg.en);
+    }, 450);
+  }
+
+  loadAct(idx, silent = false) {
+    this.actIndex = idx % ACTS.length;
+    const loopCount = Math.floor(idx / ACTS.length);
+    const cfg = ACTS[this.actIndex];
+
+    this.maxMoves = cfg.moves;
+    this.movesLeft = cfg.moves;
+    if (idx === 0) this.score = 0;
+    this.combo = 0;
+    this.selectedNode = null;
+    this.hintNodes = [];
+    this.wovenTapestry = []; // 清空上一幕织锦，开始编织新星座
+    this.isPostcardView = false;
+
+    this.targets = cfg.targets.map(t => ({
+      type: t.type,
+      total: t.count + loopCount * 4,
+      current: 0
+    }));
+
+    document.getElementById('act-roman').textContent = cfg.roman;
+    document.getElementById('act-constellation-en').textContent = cfg.en;
+    document.getElementById('act-title').textContent = cfg.title;
+    document.getElementById('act-poem').textContent = cfg.poem;
+
+    this.initAstrolabeGrid(cfg.eclipseCount);
+    this.renderObjectivesUI();
+    if (!silent) {
+      this.showPoeticToast(cfg.title, cfg.en);
+    }
+  }
+
+  initAstrolabeGrid(eclipseCount = 0) {
+    this.grid = Array.from({ length: this.NUM_RINGS }, () => Array(this.NUM_SECTORS).fill(null));
+
+    for (let r = 0; r < this.NUM_RINGS; r++) {
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        let type;
+        let guard = 0;
+        do {
+          type = Math.floor(Math.random() * STAR_SPECIES.length);
+          this.grid[r][s] = { type };
+          guard++;
+        } while (this.hasImmediateMatchAt(r, s) && guard < 30);
+
+        const theta = this.sectorToAngle(s);
+        this.grid[r][s] = {
+          uid: this.uidSeq++,
+          type,
+          special: null,
+          sealed: false,
+          curR: this.ringRadii[r],
+          curTheta: theta,
+          targetR: this.ringRadii[r],
+          targetTheta: theta,
+          thetaVel: 0,
+          scale: this.isAwakened ? 0.2 : 1,
+          alpha: this.isAwakened ? 0 : 1,
+          awakenDelay: this.isAwakened ? r * 5 + s : 0,
+          pulsePhase: Math.random() * Math.PI * 2
+        };
+      }
+    }
+
+    // 放置“日蚀暗影”封印星位
+    let placed = 0;
+    while (placed < eclipseCount) {
+      const rr = 1 + Math.floor(Math.random() * (this.NUM_RINGS - 1));
+      const ss = Math.floor(Math.random() * this.NUM_SECTORS);
+      if (!this.grid[rr][ss].sealed) {
+        this.grid[rr][ss].sealed = true;
+        placed++;
+      }
+    }
+
+    if (!this.findAnyValidAction()) {
+      this.reshuffleAstrolabe(true);
+    }
+  }
+
+  sectorToAngle(s) {
+    return -Math.PI / 2 + s * this.SECTOR_ANGLE;
+  }
+
+  normSector(s) {
+    return ((s % this.NUM_SECTORS) + this.NUM_SECTORS) % this.NUM_SECTORS;
+  }
+
+  hasImmediateMatchAt(r, s) {
+    const t = this.grid[r][s]?.type;
+    if (t === undefined || t === null) return false;
+
+    let rCount = 1;
+    for (let dr = -1; r + dr >= 0 && this.grid[r + dr][s]?.type === t; dr--) rCount++;
+    for (let dr = 1; r + dr < this.NUM_RINGS && this.grid[r + dr][s]?.type === t; dr++) rCount++;
+    if (rCount >= 3) return true;
+
+    let oCount = 1;
+    for (let ds = 1; ds < this.NUM_SECTORS; ds++) {
+      if (this.grid[r][this.normSector(s - ds)]?.type === t) oCount++;
+      else break;
+    }
+    for (let ds = 1; ds < this.NUM_SECTORS; ds++) {
+      if (this.grid[r][this.normSector(s + ds)]?.type === t) oCount++;
+      else break;
+    }
+    return oCount >= 3;
+  }
+
+  // 计算当前章节星座苏醒进度 (0 ~ 1)
+  getConstellationProgress() {
+    let totalReq = 0;
+    let totalCur = 0;
+    for (const t of this.targets) {
+      totalReq += t.total;
+      totalCur += Math.min(t.total, t.current);
+    }
+    return totalReq > 0 ? totalCur / totalReq : 0;
+  }
+
+  /**
+   * ==========================================================================
+   * 4. 交互控制与棘轮弹簧物理旋转
+   * ==========================================================================
+   */
+  bindInputEvents() {
+    const getPos = (e) => {
+      const pt = e.touches ? e.touches[0] : e;
+      return { x: pt.clientX, y: pt.clientY };
+    };
+
+    const hitTestNode = (x, y) => {
+      let best = null;
+      let bestDist = this.nodeRadius * 1.48;
+      for (let r = 0; r < this.NUM_RINGS; r++) {
+        for (let s = 0; s < this.NUM_SECTORS; s++) {
+          const node = this.grid[r][s];
+          if (!node) continue;
+          const nx = this.cx + Math.cos(node.curTheta) * node.curR;
+          const ny = this.cy + Math.sin(node.curTheta) * node.curR;
+          const d = Math.hypot(x - nx, y - ny);
+          if (d < bestDist) {
+            bestDist = d;
+            best = { r, s };
+          }
+        }
+      }
+      return best;
+    };
+
+    const hitTestRingTrack = (x, y) => {
+      const dist = Math.hypot(x - this.cx, y - this.cy);
+      const halfBand = (this.outerDialRadius * 0.2) * 0.52;
+      for (let r = 0; r < this.NUM_RINGS; r++) {
+        if (Math.abs(dist - this.ringRadii[r]) <= halfBand) return r;
+      }
+      return -1;
+    };
+
+    const onDown = (e) => {
+      // 未唤醒时，点击画布中央星盘核心即可直接无缝唤醒
+      if (!this.isAwakened) {
+        const { x, y } = getPos(e);
+        if (Math.hypot(x - this.cx, y - this.cy) <= this.outerDialRadius * 0.65) {
+          this.awakenAstrolabe();
+        }
+        return;
+      }
+
+      if (this.isBusy || this.isPostcardView) return;
+      audio.init();
+      this.hintNodes = [];
+
+      const { x, y } = getPos(e);
+      const hitNode = hitTestNode(x, y);
+      const hitRing = hitTestRingTrack(x, y);
+
+      if (hitNode) {
+        const node = this.grid[hitNode.r][hitNode.s];
+        if (node.sealed) {
+          audio.playRebound();
+          this.showPoeticToast('日蚀暗影封印', '需在相邻星位消除以驱散暗影');
+          return;
+        }
+        this.pointerOrigin = { x, y, node: hitNode, ring: hitNode.r };
+        this.dragStartAngle = Math.atan2(y - this.cy, x - this.cx);
+        this.lastTickStep = 0;
+      } else if (hitRing !== -1) {
+        if (this.isRingLocked(hitRing)) {
+          audio.playRebound();
+          this.showPoeticToast('星轨受阻', '该轨道存在被日蚀封印的星位');
+          return;
+        }
+        this.interactionMode = 'ROTATE_RING';
+        this.activeRing = hitRing;
+        this.dragStartAngle = Math.atan2(y - this.cy, x - this.cx);
+        this.lastTickStep = 0;
+        this.selectedNode = null;
+      } else {
+        this.selectedNode = null;
+      }
+    };
+
+    const onMove = (e) => {
+      if (!this.isAwakened || this.isBusy || this.isPostcardView) return;
+      const { x, y } = getPos(e);
+
+      if (this.pointerOrigin && !this.interactionMode) {
+        const dx = x - this.pointerOrigin.x;
+        const dy = y - this.pointerOrigin.y;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > 14) {
+          const { r, s } = this.pointerOrigin.node;
+          const nodeAngle = this.sectorToAngle(s);
+          const radX = Math.cos(nodeAngle), radY = Math.sin(nodeAngle);
+          const tanX = -Math.sin(nodeAngle), tanY = Math.cos(nodeAngle);
+
+          const radProj = dx * radX + dy * radY;
+          const tanProj = dx * tanX + dy * tanY;
+
+          if (Math.abs(radProj) > Math.abs(tanProj) * 1.15) {
+            const targetR = r + (radProj > 0 ? 1 : -1);
+            if (targetR >= 0 && targetR < this.NUM_RINGS) {
+              this.pointerOrigin = null;
+              this.selectedNode = null;
+              this.attemptLinkSwap(r, s, targetR, s);
+              return;
+            }
+          }
+
+          // 拖动星辰本身：切向手势始终交换相邻星位。
+          // 轨道旋转只由空白轨道区域的拖动触发，避免内圈拖动被误判成旋转。
+          const dir = tanProj > 0 ? 1 : -1;
+          const targetS = this.normSector(s + dir);
+          this.pointerOrigin = null;
+          this.selectedNode = null;
+          this.attemptLinkSwap(r, s, r, targetS);
+          return;
+        }
+      }
+
+      if (this.interactionMode === 'ROTATE_RING' && this.activeRing !== -1) {
+        const curAngle = Math.atan2(y - this.cy, x - this.cx);
+        let delta = curAngle - this.dragStartAngle;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+
+        this.ringVisualOffset[this.activeRing] = delta;
+
+        for (let s = 0; s < this.NUM_SECTORS; s++) {
+          const node = this.grid[this.activeRing][s];
+          if (node) {
+            node.curTheta = this.sectorToAngle(s) + delta;
+          }
+        }
+
+        const step = Math.round(delta / this.SECTOR_ANGLE);
+        if (step !== this.lastTickStep) {
+          this.lastTickStep = step;
+          audio.playBrassRatchet(this.activeRing, false);
+        }
+      }
+    };
+
+    const onUp = () => {
+      if (!this.isAwakened || this.isBusy || this.isPostcardView) {
+        this.pointerOrigin = null;
+        this.interactionMode = null;
+        return;
+      }
+
+      if (this.pointerOrigin && !this.interactionMode) {
+        const tapped = this.pointerOrigin.node;
+        this.pointerOrigin = null;
+        this.handleNodeTap(tapped.r, tapped.s);
+        return;
+      }
+
+      if (this.interactionMode === 'ROTATE_RING' && this.activeRing !== -1) {
+        const ring = this.activeRing;
+        const delta = this.ringVisualOffset[ring];
+        const steps = Math.round(delta / this.SECTOR_ANGLE);
+
+        this.interactionMode = null;
+        this.activeRing = -1;
+        this.pointerOrigin = null;
+
+        this.commitRingRotation(ring, steps, delta - steps * this.SECTOR_ANGLE);
+      }
+    };
+
+    this.canvas.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('blur', onUp);
+
+    this.canvas.addEventListener('touchstart', onDown, { passive: true });
+    window.addEventListener('touchmove', onMove, { passive: true });
+    window.addEventListener('touchend', onUp);
+    window.addEventListener('touchcancel', onUp);
+  }
+
+  isRingLocked(r) {
+    return this.grid[r].some(node => node && node.sealed);
+  }
+
+  areNodesAdjacent(r1, s1, r2, s2) {
+    if (r1 === r2) {
+      const diff = Math.abs(s1 - s2);
+      return diff === 1 || diff === this.NUM_SECTORS - 1;
+    }
+    if (s1 === s2) return Math.abs(r1 - r2) === 1;
+    return false;
+  }
+
+  handleNodeTap(r, s) {
+    if (!this.selectedNode) {
+      this.selectedNode = { r, s };
+      audio.playBrassRatchet(r, true);
+      return;
+    }
+    const { r: sr, s: ss } = this.selectedNode;
+    if (sr === r && ss === s) {
+      this.selectedNode = null;
+      return;
+    }
+    if (this.areNodesAdjacent(sr, ss, r, s)) {
+      this.selectedNode = null;
+      this.attemptLinkSwap(sr, ss, r, s);
+    } else {
+      this.selectedNode = { r, s };
+      audio.playBrassRatchet(r, true);
+    }
+  }
+
+  // 提交星轨旋转（注入棘轮弹簧过冲动量）
+  async commitRingRotation(ring, steps, residualAngle = 0) {
+    const normSteps = ((steps % this.NUM_SECTORS) + this.NUM_SECTORS) % this.NUM_SECTORS;
+
+    if (normSteps === 0) {
+      this.ringVisualOffset[ring] = 0;
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        const n = this.grid[ring][s];
+        n.targetTheta = this.sectorToAngle(s);
+        // 赋予反向弹簧初速度，产生真实物理回弹过冲
+        n.thetaVel = -residualAngle * 0.25;
+      }
+      return;
+    }
+
+    this.isBusy = true;
+    audio.playBrassRatchet(ring, true);
+
+    const newRow = Array(this.NUM_SECTORS);
+    for (let s = 0; s < this.NUM_SECTORS; s++) {
+      const nextS = this.normSector(s + normSteps);
+      const node = this.grid[ring][s];
+      newRow[nextS] = node;
+      node.targetTheta = this.sectorToAngle(nextS);
+      // 棘轮卡入刻度时的微小过冲初速度
+      node.thetaVel = (steps > 0 ? 0.045 : -0.045);
+    }
+    this.grid[ring] = newRow;
+    this.ringVisualOffset[ring] = 0;
+
+    await this.sleep(260);
+
+    const matchResult = this.evaluateMatches();
+    if (matchResult.matchedSet.size === 0) {
+      audio.playRebound();
+      const revertRow = Array(this.NUM_SECTORS);
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        const prevS = this.normSector(s - normSteps);
+        const node = this.grid[ring][s];
+        revertRow[prevS] = node;
+        node.targetTheta = this.sectorToAngle(prevS);
+        node.thetaVel = (steps > 0 ? -0.04 : 0.04);
+      }
+      this.grid[ring] = revertRow;
+      await this.sleep(270);
+      this.isBusy = false;
+      return;
+    }
+
+    this.movesLeft--;
+    this.combo = 0;
+    await this.executeResolutionPipeline(matchResult);
+    this.isBusy = false;
+    this.checkActProgress();
+  }
+
+  async attemptLinkSwap(r1, s1, r2, s2) {
+    const n1 = this.grid[r1][s1];
+    const n2 = this.grid[r2][s2];
+    if (!n1 || !n2 || n1.sealed || n2.sealed) {
+      audio.playRebound();
+      return;
+    }
+
+    this.isBusy = true;
+    audio.playLinkSwap();
+    this.swapGridNodes(r1, s1, r2, s2);
+    await this.sleep(240);
+
+    if (n1.special === 'SUPERNOVA' || n2.special === 'SUPERNOVA') {
+      this.movesLeft--;
+      this.combo = 1;
+      const targetType = n1.special === 'SUPERNOVA' ? n2.type : n1.type;
+      const destroySet = new Set([`${r1},${s1}`, `${r2},${s2}`]);
+      for (let r = 0; r < this.NUM_RINGS; r++) {
+        for (let s = 0; s < this.NUM_SECTORS; s++) {
+          if (this.grid[r][s]?.type === targetType) destroySet.add(`${r},${s}`);
+        }
+      }
+      this.triggerHitStopAndBreath(95, 0.032);
+      this.showPoeticToast('超新星共鸣', 'SUPERNOVA HARMONIC');
+      this.expandSpecialTriggers(destroySet);
+      await this.clearNodesWithArt(destroySet, new Map(), []);
+      await this.applyCentripetalGravity();
+      await this.runCascadeLoop();
+      this.isBusy = false;
+      this.checkActProgress();
+      return;
+    }
+
+    const matchResult = this.evaluateMatches([{ r: r1, s: s1 }, { r: r2, s: s2 }]);
+    if (matchResult.matchedSet.size === 0) {
+      audio.playRebound();
+      this.swapGridNodes(r1, s1, r2, s2);
+      await this.sleep(240);
+      this.isBusy = false;
+      return;
+    }
+
+    this.movesLeft--;
+    this.combo = 0;
+    await this.executeResolutionPipeline(matchResult);
+    this.isBusy = false;
+    this.checkActProgress();
+  }
+
+  swapGridNodes(r1, s1, r2, s2) {
+    const a = this.grid[r1][s1];
+    const b = this.grid[r2][s2];
+    this.grid[r1][s1] = b;
+    this.grid[r2][s2] = a;
+
+    b.targetR = this.ringRadii[r1];
+    b.targetTheta = this.sectorToAngle(s1);
+    a.targetR = this.ringRadii[r2];
+    a.targetTheta = this.sectorToAngle(s2);
+  }
+
+  /**
+   * ==========================================================================
+   * 5. 环形与放射轴匹配 + 微顿帧（Hit-stop）+ 星弦织锦记录
+   * ==========================================================================
+   */
+  evaluateMatches(priorityNodes = []) {
+    const orbitGroups = [];
+    const radialGroups = [];
+
+    for (let r = 0; r < this.NUM_RINGS; r++) {
+      const visited = Array(this.NUM_SECTORS).fill(false);
+      const firstType = this.grid[r][0]?.type;
+      if (firstType !== undefined && this.grid[r].every(n => n && n.type === firstType)) {
+        const coords = Array.from({ length: this.NUM_SECTORS }, (_, s) => ({ r, s }));
+        orbitGroups.push({ type: firstType, coords });
+        continue;
+      }
+
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        if (visited[s]) continue;
+        const base = this.grid[r][s];
+        if (!base || base.type < 0) continue;
+
+        let start = s;
+        while (this.grid[r][this.normSector(start - 1)]?.type === base.type) {
+          start = this.normSector(start - 1);
+          if (start === s) break;
+        }
+        const coords = [];
+        let cur = start;
+        while (this.grid[r][cur]?.type === base.type && !visited[cur]) {
+          visited[cur] = true;
+          coords.push({ r, s: cur });
+          cur = this.normSector(cur + 1);
+        }
+        if (coords.length >= 3) {
+          orbitGroups.push({ type: base.type, coords });
+        }
+      }
+    }
+
+    for (let s = 0; s < this.NUM_SECTORS; s++) {
+      let r = 0;
+      while (r < this.NUM_RINGS) {
+        const base = this.grid[r][s];
+        if (!base || base.type < 0) { r++; continue; }
+        let end = r + 1;
+        while (end < this.NUM_RINGS && this.grid[end][s]?.type === base.type) end++;
+        if (end - r >= 3) {
+          const coords = [];
+          for (let k = r; k < end; k++) coords.push({ r: k, s });
+          radialGroups.push({ type: base.type, coords });
+        }
+        r = end;
+      }
+    }
+
+    const matchedSet = new Set();
+    const specialSpawns = new Map();
+    const constellationChains = [];
+
+    const chooseAnchor = (coords) => {
+      for (const p of priorityNodes) {
+        if (coords.some(c => c.r === p.r && c.s === p.s)) return `${p.r},${p.s}`;
+      }
+      const mid = coords[Math.floor(coords.length / 2)];
+      return `${mid.r},${mid.s}`;
+    };
+
+    for (const og of orbitGroups) {
+      for (const rg of radialGroups) {
+        if (og.type !== rg.type) continue;
+        const cross = og.coords.find(oc => rg.coords.some(rc => rc.r === oc.r && rc.s === oc.s));
+        if (cross) specialSpawns.set(`${cross.r},${cross.s}`, 'SUPERNOVA');
+      }
+    }
+
+    for (const og of orbitGroups) {
+      constellationChains.push({ type: og.type, coords: og.coords });
+      og.coords.forEach(c => matchedSet.add(`${c.r},${c.s}`));
+      if (og.coords.length >= 5) {
+        specialSpawns.set(chooseAnchor(og.coords), 'SUPERNOVA');
+      } else if (og.coords.length === 4) {
+        const k = chooseAnchor(og.coords);
+        if (!specialSpawns.has(k)) specialSpawns.set(k, 'ORBIT');
+      }
+    }
+
+    for (const rg of radialGroups) {
+      constellationChains.push({ type: rg.type, coords: rg.coords });
+      rg.coords.forEach(c => matchedSet.add(`${c.r},${c.s}`));
+      if (rg.coords.length === 4) {
+        const k = chooseAnchor(rg.coords);
+        if (!specialSpawns.has(k)) specialSpawns.set(k, 'RADIAL');
+      }
+    }
+
+    return { matchedSet, specialSpawns, constellationChains };
+  }
+
+  expandSpecialTriggers(destroySet) {
+    let changed = true;
+    const processed = new Set();
+
+    while (changed) {
+      changed = false;
+      for (const key of Array.from(destroySet)) {
+        if (processed.has(key)) continue;
+        const [r, s] = key.split(',').map(Number);
+        const node = this.grid[r]?.[s];
+        if (!node || !node.special) continue;
+        processed.add(key);
+
+        if (node.special === 'ORBIT') {
+          this.ripples.push({ x: this.cx, y: this.cy, r: this.ringRadii[r], maxR: this.ringRadii[r] * 1.16, alpha: 0.95, color: '#f6e2be', width: 6 });
+          for (let ss = 0; ss < this.NUM_SECTORS; ss++) {
+            const k = `${r},${ss}`;
+            if (!destroySet.has(k)) { destroySet.add(k); changed = true; }
+          }
+        } else if (node.special === 'RADIAL') {
+          for (let rr = 0; rr < this.NUM_RINGS; rr++) {
+            const k = `${rr},${s}`;
+            if (!destroySet.has(k)) { destroySet.add(k); changed = true; }
+          }
+        } else if (node.special === 'SUPERNOVA') {
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let ds = -1; ds <= 1; ds++) {
+              const nr = r + dr;
+              const ns = this.normSector(s + ds);
+              if (nr >= 0 && nr < this.NUM_RINGS) {
+                const k = `${nr},${ns}`;
+                if (!destroySet.has(k)) { destroySet.add(k); changed = true; }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 触发 80ms 微顿帧（Hit-stop）与镜头弹性呼吸缩放
+  triggerHitStopAndBreath(ms = 80, impulse = 0.026) {
+    this.hitStopTimer = ms;
+    this.cameraScale -= impulse; // 瞬间向内蓄力微缩
+    this.cameraPulseVel = impulse * 0.42; // 随后弹性向外舒展
+  }
+
+  async executeResolutionPipeline(initialMatch) {
+    let currentMatch = initialMatch;
+    let cascadeCount = 0;
+    const MAX_CASCADE_STEPS = 14;
+    while (currentMatch && currentMatch.matchedSet.size > 0 && cascadeCount < MAX_CASCADE_STEPS) {
+      cascadeCount++;
+      this.combo++;
+      const destroySet = new Set(currentMatch.matchedSet);
+
+      for (const [spawnKey] of currentMatch.specialSpawns.entries()) {
+        const [sr, ss] = spawnKey.split(',').map(Number);
+        if (!this.grid[sr][ss]?.special) destroySet.delete(spawnKey);
+      }
+
+      this.expandSpecialTriggers(destroySet);
+      const isGrand = currentMatch.specialSpawns.size > 0 || destroySet.size >= 4 || this.combo >= 2;
+      audio.playConstellationHarmonic(this.combo, isGrand);
+
+      // 高光时刻触发微顿帧与镜头呼吸演出
+      if (isGrand) {
+        this.triggerHitStopAndBreath(80, Math.min(0.036, 0.018 + destroySet.size * 0.002));
+      }
+
+      if (this.combo >= 2) {
+        const verses = ['', '', '星弦二重奏 · HARMONIC II', '天宫三连星 · TRINITY III', '星海潮汐 · EUPHORIA IV', '宇宙交响 · SYMPHONY V'];
+        const v = verses[Math.min(this.combo, verses.length - 1)];
+        const [cn, en] = v.split(' · ');
+        this.showPoeticToast(cn, en);
+        this.auroraPulse = Math.min(1, 0.45 + this.combo * 0.16);
+      }
+
+      await this.clearNodesWithArt(destroySet, currentMatch.specialSpawns, currentMatch.constellationChains);
+      await this.applyCentripetalGravity();
+      currentMatch = this.evaluateMatches();
+    }
+
+    // 随机补星在极少数盘面下可能连续形成超长连锁；限制单次结算长度，
+    // 防止手机端长时间卡在 isBusy 状态。
+    if (currentMatch && currentMatch.matchedSet.size > 0) {
+      this.showPoeticToast('星辉归稳', 'CASCADE STABILIZED');
+      await this.reshuffleAstrolabe(true);
+    }
+
+    if (!this.findAnyValidAction()) {
+      await this.sleep(280);
+      this.showPoeticToast('星象流转 · 自动重塑', 'CELESTIAL REALIGNMENT');
+      await this.reshuffleAstrolabe(false);
+    }
+  }
+
+  async clearNodesWithArt(destroySet, specialSpawns, chains) {
+    // 1. 编织金色星弦，并存入本局“星轨织锦”永久记录（归一化坐标）
+    for (const chain of chains) {
+      const pts = chain.coords.map(({ r, s }) => {
+        const n = this.grid[r][s];
+        if (!n) return null;
+        return {
+          x: this.cx + Math.cos(n.curTheta) * n.curR,
+          y: this.cy + Math.sin(n.curTheta) * n.curR,
+          normR: n.curR / this.outerDialRadius,
+          theta: n.curTheta
+        };
+      }).filter(Boolean);
+
+      if (pts.length >= 2) {
+        const sp = STAR_SPECIES[chain.type] || STAR_SPECIES[0];
+        this.activeThreads.push({ pts, color: sp.mid, alpha: 1 });
+        this.wovenTapestry.push({
+          pts: pts.map(p => ({ normR: p.normR, theta: p.theta })),
+          color: sp.mid
+        });
+      }
+    }
+
+    await this.sleep(150);
+
+    // 2. 净化相邻的“日蚀暗影”封印星位
+    const unsealTargets = new Set();
+    for (const key of destroySet) {
+      const [r, s] = key.split(',').map(Number);
+      const neighbors = [
+        [r - 1, s], [r + 1, s],
+        [r, this.normSector(s - 1)], [r, this.normSector(s + 1)]
+      ];
+      for (const [nr, ns] of neighbors) {
+        if (nr >= 0 && nr < this.NUM_RINGS && this.grid[nr][ns]?.sealed) {
+          unsealTargets.add(`${nr},${ns}`);
+        }
+      }
+    }
+    for (const uk of unsealTargets) {
+      const [ur, us] = uk.split(',').map(Number);
+      const sealedNode = this.grid[ur][us];
+      if (sealedNode && sealedNode.sealed) {
+        sealedNode.sealed = false;
+        const nx = this.cx + Math.cos(sealedNode.curTheta) * sealedNode.curR;
+        const ny = this.cy + Math.sin(sealedNode.curTheta) * sealedNode.curR;
+        this.spawnBurstParticles(nx, ny, '#f6e2be', 16);
+      }
+    }
+
+    // 3. 消除节点与喷发流体光粒
+    const mult = 1 + (this.combo - 1) * 0.4;
+    for (const key of destroySet) {
+      const [r, s] = key.split(',').map(Number);
+      const node = this.grid[r][s];
+      if (!node) continue;
+
+      const nx = this.cx + Math.cos(node.curTheta) * node.curR;
+      const ny = this.cy + Math.sin(node.curTheta) * node.curR;
+      const sp = node.type >= 0 ? STAR_SPECIES[node.type] : STAR_SPECIES[1];
+
+      this.score += Math.round(80 * mult);
+      if (node.type >= 0) {
+        const tgt = this.targets.find(t => t.type === node.type);
+        if (tgt && tgt.current < tgt.total) tgt.current++;
+      }
+
+      this.spawnBurstParticles(nx, ny, sp.mid, 16);
+      this.ripples.push({
+        x: nx,
+        y: ny,
+        r: 4,
+        maxR: this.nodeRadius * 2.4,
+        alpha: 0.85,
+        color: sp.core,
+        width: 1.8
+      });
+
+      this.grid[r][s] = null;
+    }
+
+    // 4. 凝结特殊星辰核心
+    for (const [spawnKey, spType] of specialSpawns.entries()) {
+      const [r, s] = spawnKey.split(',').map(Number);
+      const node = this.grid[r][s];
+      if (node) {
+        node.special = spType;
+        if (spType === 'SUPERNOVA') node.type = -1;
+        node.scale = 1.48;
+        const nx = this.cx + Math.cos(node.curTheta) * node.curR;
+        const ny = this.cy + Math.sin(node.curTheta) * node.curR;
+        this.spawnBurstParticles(nx, ny, '#f6e2be', 22);
+      }
+    }
+
+    this.renderObjectivesUI();
+    await this.sleep(210);
+  }
+
+  async applyCentripetalGravity() {
+    for (let s = 0; s < this.NUM_SECTORS; s++) {
+      let writeR = 0;
+      for (let r = 0; r < this.NUM_RINGS; r++) {
+        if (this.grid[r][s] !== null) {
+          if (writeR !== r) {
+            const node = this.grid[r][s];
+            this.grid[writeR][s] = node;
+            this.grid[r][s] = null;
+            node.targetR = this.ringRadii[writeR];
+            node.targetTheta = this.sectorToAngle(s);
+          }
+          writeR++;
+        }
+      }
+
+      let spawnStep = 1;
+      for (let r = writeR; r < this.NUM_RINGS; r++) {
+        const type = Math.floor(Math.random() * STAR_SPECIES.length);
+        const theta = this.sectorToAngle(s);
+        this.grid[r][s] = {
+          uid: this.uidSeq++,
+          type,
+          special: null,
+          sealed: false,
+          curR: this.outerDialRadius + spawnStep * 36,
+          curTheta: theta,
+          targetR: this.ringRadii[r],
+          targetTheta: theta,
+          thetaVel: 0,
+          scale: 0.2,
+          alpha: 0,
+          awakenDelay: 0,
+          pulsePhase: Math.random() * Math.PI * 2
+        };
+        spawnStep++;
+      }
+    }
+    await this.sleep(310);
+  }
+
+  async runCascadeLoop() {
+    const nextMatch = this.evaluateMatches();
+    if (nextMatch.matchedSet.size > 0) {
+      await this.executeResolutionPipeline(nextMatch);
+    }
+  }
+
+  // 只返回玩家可以通过点选/拖动直接完成的相邻交换。
+  // 提示高亮必须与实际输入规则一致，不能把整圈旋转伪装成两个星辰交换。
+  findAnyValidSwap() {
+    for (let r = 0; r < this.NUM_RINGS; r++) {
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        const n1 = this.grid[r][s];
+        if (!n1 || n1.sealed) continue;
+
+        const candidates = [
+          { r, s: this.normSector(s + 1) },
+          { r: r + 1, s }
+        ];
+
+        for (const nb of candidates) {
+          if (nb.r >= this.NUM_RINGS) continue;
+          const n2 = this.grid[nb.r][nb.s];
+          if (!n2 || n2.sealed) continue;
+
+          if (n1.special === 'SUPERNOVA' || n2.special === 'SUPERNOVA') {
+            return [{ r, s }, nb];
+          }
+
+          this.grid[r][s] = n2;
+          this.grid[nb.r][nb.s] = n1;
+          const hasMatch = this.evaluateMatches().matchedSet.size > 0;
+          this.grid[r][s] = n1;
+          this.grid[nb.r][nb.s] = n2;
+
+          if (hasMatch) return [{ r, s }, nb];
+        }
+      }
+    }
+    return null;
+  }
+
+  // 检查是否仍有可玩的操作：先查直接交换，再查未封印轨道旋转。
+  findAnyValidAction() {
+    const swap = this.findAnyValidSwap();
+    if (swap) return { type: 'swap', nodes: swap };
+
+    for (let r = 0; r < this.NUM_RINGS; r++) {
+      if (this.isRingLocked(r)) continue;
+      const origRow = [...this.grid[r]];
+      for (let shift = 1; shift < this.NUM_SECTORS; shift++) {
+        this.grid[r] = origRow.map((_, idx) => origRow[this.normSector(idx - shift)]);
+        const hasMatch = this.evaluateMatches().matchedSet.size > 0;
+        this.grid[r] = origRow;
+        if (hasMatch) return { type: 'rotate', ring: r, steps: shift };
+      }
+      this.grid[r] = origRow;
+    }
+    return null;
+  }
+
+  async reshuffleAstrolabe(silent = false) {
+    const unlocked = [];
+    for (let r = 0; r < this.NUM_RINGS; r++) {
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        if (this.grid[r][s] && !this.grid[r][s].sealed) unlocked.push(this.grid[r][s]);
+      }
+    }
+
+    let tries = 0;
+    do {
+      for (let i = unlocked.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [unlocked[i], unlocked[j]] = [unlocked[j], unlocked[i]];
+      }
+      let k = 0;
+      for (let r = 0; r < this.NUM_RINGS; r++) {
+        for (let s = 0; s < this.NUM_SECTORS; s++) {
+          if (this.grid[r][s] && !this.grid[r][s].sealed) {
+            const node = unlocked[k++];
+            this.grid[r][s] = node;
+            node.targetR = this.ringRadii[r];
+            node.targetTheta = this.sectorToAngle(s);
+          }
+        }
+      }
+      tries++;
+    } while ((this.evaluateMatches().matchedSet.size > 0 || !this.findAnyValidAction()) && tries < 40);
+
+    if (!silent) {
+      audio.playConstellationHarmonic(2, true);
+      await this.sleep(360);
+    }
+  }
+
+  spawnBurstParticles(x, y, color, count = 16) {
+    for (let i = 0; i < count; i++) {
+      const ang = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45;
+      const spd = 0.8 + Math.random() * 3.4;
+      this.particles.push({
+        x, y,
+        vx: Math.cos(ang) * spd,
+        vy: Math.sin(ang) * spd,
+        size: 1.5 + Math.random() * 3.2,
+        alpha: 1,
+        decay: 0.016 + Math.random() * 0.016,
+        color: i % 3 === 0 ? '#fff9eb' : color,
+        rot: Math.random() * Math.PI * 2,
+        vRot: (Math.random() - 0.5) * 0.18
+      });
+    }
+  }
+
+  renderObjectivesUI() {
+    document.getElementById('score-val').textContent = this.score.toLocaleString();
+    const progPct = Math.round(this.getConstellationProgress() * 100);
+    const cfg = ACTS[this.actIndex];
+    document.getElementById('constellation-progress-text').textContent = `${cfg.constellationName}苏醒度 · ${progPct}%`;
+
+    const bar = document.getElementById('objectives-bar');
+    bar.innerHTML = this.targets.map(t => {
+      const sp = STAR_SPECIES[t.type];
+      const rem = Math.max(0, t.total - t.current);
+      const done = rem === 0;
+      return `
+        <div class="flex items-center gap-2.5 transition-opacity duration-300 ${done ? 'opacity-45' : 'opacity-100'}">
+          <span class="w-3 h-3 rounded-full inline-block" style="background: radial-gradient(circle, ${sp.core}, ${sp.mid}); box-shadow: 0 0 12px ${sp.glow};"></span>
+          <span class="text-xs tracking-[0.18em] text-slate-300">${sp.name}</span>
+          <span class="font-cinzel text-sm ${done ? 'text-[#9ed8c4]' : 'text-[#f6e2be]'}">
+            ${done ? '✦' : rem}
+          </span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  showPoeticToast(cn, en) {
+    const anchor = document.getElementById('toast-anchor');
+    anchor.innerHTML = `
+      <div class="poetic-toast text-center px-4 py-1.5">
+        <div class="font-cinzel text-[10px] tracking-[0.35em] text-[#d8b47c] uppercase">${en}</div>
+        <div class="font-serif-cn text-base sm:text-lg text-[#f7f2ea] tracking-[0.22em] mt-0.5 drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)]">${cn}</div>
+      </div>
+    `;
+  }
+
+  checkActProgress() {
+    const allCleared = this.targets.every(t => t.current >= t.total);
+    if (allCleared) {
+      this.score += this.movesLeft * 150;
+      this.renderObjectivesUI();
+      setTimeout(() => this.openTapestryPostcard(true), 450);
+      return;
+    }
+    if (this.movesLeft <= 0) {
+      setTimeout(() => this.openTapestryPostcard(false), 450);
+    }
+  }
+
+  // 打开通关诗意星图明信片（保留星盘上的所有星弦织锦轨迹）
+  openTapestryPostcard(isWin) {
+    this.isPostcardView = true;
+    const card = document.getElementById('tapestry-postcard');
+    const sub = document.getElementById('postcard-sub');
+    const title = document.getElementById('postcard-title');
+    const verse = document.getElementById('postcard-verse');
+    const threadsEl = document.getElementById('postcard-threads');
+    const scoreEl = document.getElementById('postcard-score');
+    const btn = document.getElementById('btn-next-act');
+    const cfg = ACTS[this.actIndex];
+
+    threadsEl.textContent = String(this.wovenTapestry.length);
+    scoreEl.textContent = this.score.toLocaleString();
+
+    if (isWin) {
+      audio.playConstellationHarmonic(4, true);
+      sub.textContent = `${cfg.constellationName} · CONSTELLATION AWAKENED`;
+      title.textContent = `${cfg.constellationName} · 星轨织锦已成`;
+      verse.textContent = cfg.closingVerse;
+      btn.textContent = '踏入下一星域';
+      btn.onclick = () => {
+        card.classList.remove('active');
+        this.loadAct(this.actIndex + 1);
+      };
+    } else {
+      audio.playRebound();
+      sub.textContent = 'RESONANCE FADED';
+      title.textContent = '星律暂歇 · 归于深空';
+      verse.textContent = '“星弦尚差最后一缕微光，重新拨动指针可再度唤醒此幕。”';
+      btn.textContent = '重塑当前星域';
+      btn.onclick = () => {
+        card.classList.remove('active');
+        this.loadAct(this.actIndex);
+      };
+    }
+
+    card.classList.add('active');
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * ==========================================================================
+   * 6. 物理帧更新与全屏星象仪光绘渲染循环
+   * ==========================================================================
+   */
+  startRenderLoop() {
+    let lastTime = performance.now();
+    const render = (now) => {
+      const dt = Math.min(50, now - lastTime);
+      lastTime = now;
+
+      // 微顿帧（Hit-stop）期间冻结粒子与轨道位移，保留星弦与光晕震颤
+      if (this.hitStopTimer > 0) {
+        this.hitStopTimer -= dt;
+      } else {
+        this.updatePhysics();
+      }
+
+      this.drawScene(now * 0.001);
+      requestAnimationFrame(render);
+    };
+    requestAnimationFrame(render);
+  }
+
+  updatePhysics() {
+    this.ambientAngle += this.isAwakened ? 0.0014 : 0.0038;
+    if (this.auroraPulse > 0) this.auroraPulse = Math.max(0, this.auroraPulse - 0.012);
+
+    // 镜头弹性呼吸与推镜插值
+    this.cameraScale += (this.targetCameraScale - this.cameraScale) * 0.08 + this.cameraPulseVel;
+    this.cameraPulseVel *= 0.72;
+
+    // 弹簧阻尼更新所有星辰位置与棘轮过冲
+    const springR = 0.19;
+    const springTheta = 0.22;
+    const damping = 0.68;
+
+    for (let r = 0; r < this.NUM_RINGS; r++) {
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        const node = this.grid[r][s];
+        if (!node) continue;
+
+        if (node.awakenDelay > 0) {
+          node.awakenDelay--;
+          continue;
+        }
+
+        node.curR += (node.targetR - node.curR) * springR;
+        node.scale += (1 - node.scale) * 0.16;
+        node.alpha += (1 - node.alpha) * 0.14;
+
+        if (!(this.interactionMode === 'ROTATE_RING' && this.activeRing === r)) {
+          let diff = node.targetTheta - node.curTheta;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          node.thetaVel = (node.thetaVel + diff * springTheta) * damping;
+          node.curTheta += node.thetaVel;
+        }
+      }
+    }
+
+    for (let i = this.activeThreads.length - 1; i >= 0; i--) {
+      this.activeThreads[i].alpha -= 0.022;
+      if (this.activeThreads[i].alpha <= 0) this.activeThreads.splice(i, 1);
+    }
+
+    for (let i = this.ripples.length - 1; i >= 0; i--) {
+      const rp = this.ripples[i];
+      rp.r += (rp.maxR - rp.r) * 0.12;
+      rp.alpha -= 0.03;
+      if (rp.alpha <= 0) this.ripples.splice(i, 1);
+    }
+
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vx *= 0.96;
+      p.vy *= 0.96;
+      p.rot += p.vRot;
+      p.alpha -= p.decay;
+      if (p.alpha <= 0) this.particles.splice(i, 1);
+    }
+  }
+
+  drawScene(t) {
+    const ctx = this.ctx;
+    const cfg = ACTS[this.actIndex];
+    const progress = this.getConstellationProgress();
+
+    // 1. 动态情绪星云背景（随星座苏醒度从深海幽蓝渐变至极光紫/暮光金）
+    const r = Math.round(cfg.nebulaStart[0] + (cfg.nebulaEnd[0] - cfg.nebulaStart[0]) * progress);
+    const g = Math.round(cfg.nebulaStart[1] + (cfg.nebulaEnd[1] - cfg.nebulaStart[1]) * progress);
+    const b = Math.round(cfg.nebulaStart[2] + (cfg.nebulaEnd[2] - cfg.nebulaStart[2]) * progress);
+
+    const bgGrad = ctx.createRadialGradient(this.cx, this.cy, this.outerDialRadius * 0.08, this.cx, this.cy, Math.max(this.width, this.height) * 0.8);
+    bgGrad.addColorStop(0, `rgb(${r}, ${g}, ${b})`);
+    bgGrad.addColorStop(1, '#05070c');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    // 连击极光弥散光晕
+    if (this.auroraPulse > 0.01) {
+      const aur = ctx.createRadialGradient(this.cx, this.cy, this.outerDialRadius * 0.2, this.cx, this.cy, this.outerDialRadius * 1.45);
+      aur.addColorStop(0, `rgba(216, 180, 124, ${this.auroraPulse * 0.2})`);
+      aur.addColorStop(0.6, `rgba(111, 212, 178, ${this.auroraPulse * 0.14})`);
+      aur.addColorStop(1, 'transparent');
+      ctx.fillStyle = aur;
+      ctx.fillRect(0, 0, this.width, this.height);
+    }
+
+    // 2. 深空闪烁星尘
+    for (const st of this.bgStars) {
+      const a = st.alpha * (0.55 + 0.45 * Math.sin(t * 1.8 + st.phase));
+      ctx.fillStyle = `rgba(235, 228, 214, ${a})`;
+      ctx.beginPath();
+      ctx.arc(st.x * this.width, st.y * this.height, st.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 应用镜头呼吸与推镜变换矩阵
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+    ctx.scale(this.cameraScale, this.cameraScale);
+    ctx.translate(-this.cx, -this.cy);
+
+    // 3. 星象仪背景深处的【星座图腾线稿】（随进度逐颗点亮主星与星弦）
+    this.drawConstellationWatermark(cfg.constellation, progress, t);
+
+    // 4. 外围黄铜日晷刻度与星律步数弧
+    this.drawOuterAstrolabeDial(t);
+
+    // 5. 放射状星轴与同心圆轨道
+    for (let s = 0; s < this.NUM_SECTORS; s++) {
+      const ang = this.sectorToAngle(s);
+      ctx.strokeStyle = 'rgba(216, 180, 124, 0.13)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(this.cx + Math.cos(ang) * (this.ringRadii[0] * 0.52), this.cy + Math.sin(ang) * (this.ringRadii[0] * 0.52));
+      ctx.lineTo(this.cx + Math.cos(ang) * (this.outerDialRadius * 0.95), this.cy + Math.sin(ang) * (this.outerDialRadius * 0.95));
+      ctx.stroke();
+    }
+
+    for (let ringIdx = 0; ringIdx < this.NUM_RINGS; ringIdx++) {
+      const rad = this.ringRadii[ringIdx];
+      const isDraggingThis = this.interactionMode === 'ROTATE_RING' && this.activeRing === ringIdx;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(this.cx, this.cy, rad, 0, Math.PI * 2);
+      ctx.strokeStyle = isDraggingThis ? 'rgba(246, 226, 190, 0.7)' : 'rgba(216, 180, 124, 0.22)';
+      ctx.lineWidth = isDraggingThis ? 2.2 : 1.1;
+      if (ringIdx % 2 === 1 && !isDraggingThis) ctx.setLineDash([4, 6]);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 6. 中央浑天仪核心
+    this.drawCenterCore(t);
+
+    // 7. 若处于通关明信片界面，绘制本局累计编织的【星轨织锦】
+    if (this.isPostcardView) {
+      this.drawWovenTapestryOverlay();
+    }
+
+    // 8. 消除瞬间的金色星弦连线
+    for (const th of this.activeThreads) {
+      ctx.save();
+      ctx.strokeStyle = th.color;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = th.color;
+      ctx.globalAlpha = th.alpha;
+      ctx.lineWidth = 3.4;
+      ctx.beginPath();
+      th.pts.forEach((pt, idx) => {
+        if (idx === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      });
+      ctx.stroke();
+
+      ctx.strokeStyle = '#fff9eb';
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 9. 空间扩散涟漪
+    for (const rp of this.ripples) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+      ctx.strokeStyle = rp.color;
+      ctx.globalAlpha = rp.alpha;
+      ctx.lineWidth = rp.width;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 10. 星辰节点（通关明信片展示时淡化棋子，凸显编织出的星轨图腾）
+    const nodeOpacityFactor = this.isPostcardView ? 0.22 : 1.0;
+    for (let ringIdx = 0; ringIdx < this.NUM_RINGS; ringIdx++) {
+      for (let s = 0; s < this.NUM_SECTORS; s++) {
+        const node = this.grid[ringIdx][s];
+        if (!node) continue;
+        const isSelected = this.selectedNode && this.selectedNode.r === ringIdx && this.selectedNode.s === s;
+        const isHinted = this.hintNodes.some(h => h.r === ringIdx && h.s === s);
+        this.drawStarNode(node, t, isSelected, isHinted, nodeOpacityFactor);
+      }
+    }
+
+    // 11. 流体星光粒子
+    for (const p of this.particles) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = p.color;
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size * 1.4);
+      ctx.lineTo(p.size * 0.45, -p.size * 0.45);
+      ctx.lineTo(p.size * 1.4, 0);
+      ctx.lineTo(p.size * 0.45, p.size * 0.45);
+      ctx.lineTo(0, p.size * 1.4);
+      ctx.lineTo(-p.size * 0.45, p.size * 0.45);
+      ctx.lineTo(-p.size * 1.4, 0);
+      ctx.lineTo(-p.size * 0.45, -p.size * 0.45);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  // 绘制背景深处随进度逐颗点亮的星座图腾线稿
+  drawConstellationWatermark(constellation, progress, t) {
+    if (!constellation) return;
+    const ctx = this.ctx;
+    const scaleR = this.outerDialRadius * 0.85;
+    const litStarCount = Math.floor(progress * constellation.stars.length);
+
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+
+    // 绘制星座连线
+    for (const [i, j] of constellation.edges) {
+      const s1 = constellation.stars[i];
+      const s2 = constellation.stars[j];
+      const bothLit = i < litStarCount && j < litStarCount;
+
+      ctx.beginPath();
+      ctx.moveTo(s1.x * scaleR, s1.y * scaleR);
+      ctx.lineTo(s2.x * scaleR, s2.y * scaleR);
+      ctx.strokeStyle = bothLit
+        ? `rgba(246, 226, 190, ${this.isPostcardView ? 0.78 : 0.34})`
+        : 'rgba(216, 180, 124, 0.08)';
+      ctx.lineWidth = bothLit ? (this.isPostcardView ? 2.2 : 1.4) : 1;
+      ctx.stroke();
+    }
+
+    // 绘制星座主星节点
+    constellation.stars.forEach((st, idx) => {
+      const isLit = idx < litStarCount;
+      const sx = st.x * scaleR;
+      const sy = st.y * scaleR;
+      const pulse = isLit ? (1 + 0.18 * Math.sin(t * 3 + idx)) : 1;
+
+      ctx.beginPath();
+      ctx.arc(sx, sy, (isLit ? 4.5 : 2.5) * pulse, 0, Math.PI * 2);
+      ctx.fillStyle = isLit ? '#fff7e2' : 'rgba(216, 180, 124, 0.16)';
+      if (isLit) {
+        ctx.shadowBlur = 16;
+        ctx.shadowColor = '#f6e2be';
+      } else {
+        ctx.shadowBlur = 0;
+      }
+      ctx.fill();
+    });
+
+    ctx.restore();
+  }
+
+  // 绘制通关明信片上的【本局累计星轨织锦】
+  drawWovenTapestryOverlay() {
+    const ctx = this.ctx;
+    ctx.save();
+    for (const thread of this.wovenTapestry) {
+      ctx.beginPath();
+      thread.pts.forEach((pt, idx) => {
+        const x = this.cx + Math.cos(pt.theta) * (pt.normR * this.outerDialRadius);
+        const y = this.cy + Math.sin(pt.theta) * (pt.normR * this.outerDialRadius);
+        if (idx === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = thread.color;
+      ctx.globalAlpha = 0.42;
+      ctx.lineWidth = 1.6;
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = thread.color;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawOuterAstrolabeDial(t) {
+    const ctx = this.ctx;
+    const R = this.outerDialRadius;
+
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+
+    ctx.save();
+    ctx.rotate(this.ambientAngle);
+    ctx.strokeStyle = 'rgba(216, 180, 124, 0.24)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 1.04, 0, Math.PI * 2);
+    ctx.stroke();
+
+    for (let i = 0; i < 48; i++) {
+      const a = (Math.PI * 2 * i) / 48;
+      const len = i % 6 === 0 ? 9 : 4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * (R * 1.04 - len), Math.sin(a) * (R * 1.04 - len));
+      ctx.lineTo(Math.cos(a) * (R * 1.04), Math.sin(a) * (R * 1.04));
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    const ratio = Math.max(0, this.movesLeft / this.maxMoves);
+    const startA = -Math.PI / 2;
+    const endA = startA + Math.PI * 2 * ratio;
+
+    ctx.beginPath();
+    ctx.arc(0, 0, R * 0.985, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    if (ratio > 0) {
+      ctx.beginPath();
+      ctx.arc(0, 0, R * 0.985, startA, endA);
+      ctx.strokeStyle = this.movesLeft <= 5 ? '#e87a8a' : '#d8b47c';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = this.movesLeft <= 5 ? 'rgba(232, 122, 138, 0.7)' : 'rgba(216, 180, 124, 0.6)';
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  drawCenterCore(t) {
+    const ctx = this.ctx;
+    const coreR = this.ringRadii[0] * 0.48;
+
+    ctx.save();
+    ctx.translate(this.cx, this.cy);
+
+    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, coreR * 1.25);
+    g.addColorStop(0, 'rgba(216, 180, 124, 0.25)');
+    g.addColorStop(0.7, 'rgba(12, 17, 28, 0.78)');
+    g.addColorStop(1, 'transparent');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, coreR * 1.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.rotate(t * 0.25);
+    ctx.strokeStyle = 'rgba(216, 180, 124, 0.48)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 0, coreR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.rotate(-t * 0.5);
+    ctx.strokeStyle = 'rgba(246, 226, 190, 0.3)';
+    ctx.strokeRect(-coreR * 0.62, -coreR * 0.62, coreR * 1.24, coreR * 1.24);
+    ctx.restore();
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (!this.isAwakened) {
+      // 未唤醒时中央显示八芒唤醒星徽
+      ctx.fillStyle = '#f6e2be';
+      ctx.font = `400 ${Math.round(coreR * 0.75)}px serif`;
+      ctx.fillText('✦', this.cx, this.cy + 1);
+    } else {
+      ctx.fillStyle = this.movesLeft <= 5 ? '#f28b99' : '#f6e2be';
+      ctx.font = `600 ${Math.round(coreR * 0.76)}px Cinzel, serif`;
+      ctx.fillText(String(this.movesLeft), this.cx, this.cy - 2);
+
+      ctx.fillStyle = 'rgba(216, 180, 124, 0.65)';
+      ctx.font = `400 ${Math.max(8, Math.round(coreR * 0.24))}px Cinzel, serif`;
+      ctx.fillText('MOVES', this.cx, this.cy + coreR * 0.48);
+    }
+    ctx.restore();
+  }
+
+  drawStarNode(node, t, isSelected, isHinted, opacityFactor = 1) {
+    const ctx = this.ctx;
+    const x = this.cx + Math.cos(node.curTheta) * node.curR;
+    const y = this.cy + Math.sin(node.curTheta) * node.curR;
+    const breathe = 1 + 0.04 * Math.sin(t * 2.4 + node.pulsePhase);
+    const rad = this.nodeRadius * node.scale * breathe * (isSelected ? 1.18 : 1);
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalAlpha = node.alpha * opacityFactor;
+
+    if (isSelected || isHinted) {
+      const pulse = 0.65 + 0.35 * Math.sin(t * 6);
+      ctx.beginPath();
+      ctx.arc(0, 0, rad * 1.38, 0, Math.PI * 2);
+      ctx.strokeStyle = isSelected ? `rgba(246, 226, 190, ${pulse})` : `rgba(111, 212, 178, ${pulse})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    if (node.special === 'ORBIT') {
+      ctx.beginPath();
+      ctx.arc(0, 0, rad * 1.24, -0.45, 0.45);
+      ctx.strokeStyle = '#fff5d6';
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, rad * 1.24, Math.PI - 0.45, Math.PI + 0.45);
+      ctx.stroke();
+    } else if (node.special === 'RADIAL') {
+      ctx.save();
+      ctx.rotate(node.curTheta);
+      ctx.strokeStyle = '#fff5d6';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-rad * 1.35, 0);
+      ctx.lineTo(rad * 1.35, 0);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    if (node.special === 'SUPERNOVA') {
+      ctx.rotate(t * 0.9);
+      const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, rad * 1.15);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.45, '#f6e2be');
+      grad.addColorStop(0.75, '#74d4b6');
+      grad.addColorStop(1, 'rgba(173, 140, 230, 0.2)');
+      ctx.fillStyle = grad;
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = '#f6e2be';
+      this.traceStarPolygon(ctx, 8, rad * 1.12, rad * 0.48);
+      ctx.fill();
+      ctx.restore();
+      return;
+    }
+
+    const sp = STAR_SPECIES[node.type];
+    const grad = ctx.createRadialGradient(-rad * 0.25, -rad * 0.25, 1, 0, 0, rad);
+    grad.addColorStop(0, sp.core);
+    grad.addColorStop(0.55, sp.mid);
+    grad.addColorStop(1, sp.deep);
+
+    ctx.fillStyle = grad;
+    ctx.shadowBlur = isSelected ? 18 : 10;
+    ctx.shadowColor = sp.glow;
+
+    ctx.save();
+    ctx.rotate(node.curTheta + Math.PI / 2);
+    this.traceStarPolygon(ctx, sp.sides, rad, rad * 0.56);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+    this.traceStarPolygon(ctx, sp.sides, rad * 0.46, rad * 0.26);
+    ctx.fill();
+    ctx.restore();
+
+    // 日蚀暗影封印结界（深邃暗金月蚀环）
+    if (node.sealed) {
+      ctx.beginPath();
+      ctx.arc(0, 0, rad * 1.22, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(12, 10, 22, 0.52)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(216, 180, 124, 0.85)';
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+
+      // 月蚀新月徽记
+      ctx.beginPath();
+      ctx.arc(0, 0, rad * 0.65, -0.8, 2.2);
+      ctx.strokeStyle = 'rgba(246, 226, 190, 0.75)';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  traceStarPolygon(ctx, points, outerR, innerR) {
+    ctx.beginPath();
+    const total = points * 2;
+    for (let i = 0; i < total; i++) {
+      const r = i % 2 === 0 ? outerR : innerR;
+      const a = (Math.PI * 2 * i) / total - Math.PI / 2;
+      const px = Math.cos(a) * r;
+      const py = Math.sin(a) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  const game = new AstralLoomMasterGame();
+
+  // 无缝唤醒星仪按钮
+  document.getElementById('btn-awaken-core').addEventListener('click', () => {
+    game.awakenAstrolabe();
+  });
+
+  // 声景开关
+  document.getElementById('btn-audio').addEventListener('click', () => {
+    const muted = audio.toggleMute();
+    document.getElementById('icon-audio-on').classList.toggle('hidden', muted);
+    document.getElementById('icon-audio-off').classList.toggle('hidden', !muted);
+  });
+
+  // 星盘重塑
+  document.getElementById('btn-reshuffle').addEventListener('click', () => {
+    if (!game.isAwakened || game.isBusy || game.isPostcardView) return;
+    game.showPoeticToast('星象流转', 'ASTROLABE RESHUFFLED');
+    game.reshuffleAstrolabe(false);
+  });
+
+  // 星灵指引
+  document.getElementById('btn-hint').addEventListener('click', () => {
+    if (!game.isAwakened || game.isBusy || game.isPostcardView) return;
+    const hint = game.findAnyValidSwap();
+    if (hint) {
+      game.hintNodes = hint;
+      audio.playBrassRatchet(2, true);
+    } else {
+      game.hintNodes = [];
+      game.showPoeticToast('星轨暂无直接交换', 'TRY ROTATING AN UNSEALED RING');
+    }
+  });
+});
+</script>
+</body>
+</html>
